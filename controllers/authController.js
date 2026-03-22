@@ -31,6 +31,7 @@ const register = async (req, res) => {
       user,
     });
   } catch (error) {
+    console.error("Register error:", error);
     res.status(500).json({
       message: "Server error",
       error: error.message,
@@ -52,7 +53,7 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
@@ -74,6 +75,7 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({
       message: "Server error",
       error: error.message,
