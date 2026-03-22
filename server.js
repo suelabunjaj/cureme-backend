@@ -1,3 +1,6 @@
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const express = require("express");
 const cors = require("cors");
 const OpenAI = require("openai");
@@ -112,6 +115,58 @@ app.get("/questions", async (req, res) => {
   } catch (error) {
     console.error("Error in /questions:", error);
     res.status(500).json({ error: "Failed to fetch questions" });
+  }
+});
+app.post("/register", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Name, email, and password are required",
+      });
+    }
+
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({
+        message: "User already exists with this email",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await pool.query(
+      `
+      INSERT INTO users (name, email, password_hash)
+      VALUES ($1, $2, $3)
+      RETURNING id, name, email, created_at
+      `,
+      [name, email, hashedPassword]
+    );
+
+    const user = result.rows[0];
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      message: "User registered successfully",
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error("Error in /register:", error);
+    res.status(500).json({
+      message: "Registration failed",
+    });
   }
 });
 
