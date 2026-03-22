@@ -1,4 +1,7 @@
-const { createQuestion, getQuestionsByUser } = require("../models/questionModel");
+const {
+  createQuestion,
+  getQuestionsByUser,
+} = require("../models/questionModel");
 const { getAIResponse } = require("../utils/aiService");
 
 const askQuestion = async (req, res) => {
@@ -6,8 +9,10 @@ const askQuestion = async (req, res) => {
     const { question_text } = req.body;
     const userId = req.user.id;
 
-    if (!question_text) {
-      return res.status(400).json({ message: "Question text is required" });
+    if (!question_text || !question_text.trim()) {
+      return res.status(400).json({
+        message: "Question text is required",
+      });
     }
 
     const aiResponse = await getAIResponse(question_text);
@@ -18,6 +23,7 @@ const askQuestion = async (req, res) => {
       data: savedQuestion,
     });
   } catch (error) {
+    console.error("askQuestion error:", error);
     res.status(500).json({
       message: "Server error",
       error: error.message,
@@ -30,23 +36,27 @@ const getHistory = async (req, res) => {
     const userId = req.user.id;
     const history = await getQuestionsByUser(userId);
 
-    res.json({
+    res.status(200).json({
       message: "Question history retrieved successfully",
       data: history,
     });
   } catch (error) {
+    console.error("getHistory error:", error);
     res.status(500).json({
       message: "Server error",
       error: error.message,
     });
   }
 };
+
 const askGuestQuestion = async (req, res) => {
   try {
     const { question_text } = req.body;
 
-    if (!question_text) {
-      return res.status(400).json({ message: "Question text is required" });
+    if (!question_text || !question_text.trim()) {
+      return res.status(400).json({
+        message: "Question text is required",
+      });
     }
 
     const aiResponse = await getAIResponse(question_text);
@@ -55,13 +65,14 @@ const askGuestQuestion = async (req, res) => {
       message: "Guest question answered successfully",
       data: {
         question_text,
-        ai_response: aiResponse
-      }
+        ai_response: aiResponse,
+      },
     });
   } catch (error) {
+    console.error("askGuestQuestion error:", error);
     res.status(500).json({
       message: "Server error",
-      error: error.message
+      error: error.message,
     });
   }
 };
