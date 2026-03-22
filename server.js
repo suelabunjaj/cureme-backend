@@ -1,4 +1,3 @@
-
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const express = require("express");
@@ -17,6 +16,35 @@ app.use(express.json());
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const authMiddleware = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({
+        message: "No token provided",
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({
+        message: "Invalid token format",
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid token",
+    });
+  }
+};
 
 app.get("/", (req, res) => {
   res.json({ message: "cureME backend is running" });
@@ -99,6 +127,7 @@ app.get("/questions", async (req, res) => {
     const result = await pool.query(`
       SELECT 
         q.id AS question_id,
+        q.user_id,
         q.question_text,
         q.status,
         q.created_at AS question_created_at,
@@ -117,6 +146,39 @@ app.get("/questions", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch questions" });
   }
 });
+
+app.get("/history", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const result = await pool.query(
+      `
+      SELECT 
+        q.id AS question_id,
+        q.question_text,
+        q.status,
+        q.created_at AS question_created_at,
+        a.id AS answer_id,
+        a.answer_text,
+        a.source,
+        a.created_at AS answer_created_at
+      FROM questions q
+      LEFT JOIN answers a ON q.id = a.question_id
+      WHERE q.user_id = $1
+      ORDER BY q.created_at DESC
+      `,
+      [userId]
+    );
+
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Error in /history:", error);
+    res.status(500).json({
+      message: "Failed to fetch user history",
+    });
+  }
+});
+
 app.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -169,6 +231,7 @@ app.post("/register", async (req, res) => {
     });
   }
 });
+
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
